@@ -1,41 +1,78 @@
-import iziToast from 'izitoast';
+const startBtn = document.querySelector('[data-start]');
+const dateInput = document.querySelector('#datetime-picker');
+const daysEl = document.querySelector('[data-days]');
+const hoursEl = document.querySelector('[data-hours]');
+const minutesEl = document.querySelector('[data-minutes]');
+const secondsEl = document.querySelector('[data-seconds]');
 
-import 'izitoast/dist/css/iziToast.min.css';
+let userSelectedDate = null;
+let countdownInterval = null;
 
-const form = document.querySelector('.form');
-const delayInput = document.querySelector('.form input[type="number"]');
-const resolveInput = document.querySelector('.form input[value="fulfilled"]');
+function addLeadingZero(value) {
+  return String(value).padStart(2, '0');
+}
 
-form.addEventListener('submit', e => {
-  e.preventDefault();
+function convertMs(ms) {
+  const second = 1000;
+  const minute = second * 60;
+  const hour = minute * 60;
+  const day = hour * 24;
 
-  const delay = e.target.elements.delay.value;
-  const checked = e.target.elements.state.value;
+  const days = Math.floor(ms / day);
+  const hours = Math.floor((ms % day) / hour);
+  const minutes = Math.floor(((ms % day) % hour) / minute);
+  const seconds = Math.floor((((ms % day) % hour) % minute) / second);
 
-  const promise = new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (checked === 'fulfilled') {
-        resolve(`✅ Fulfilled promise in ${delay} ms`);
-      } else {
-        reject(`❌ Rejected promise in ${delay} ms`);
-      }
-    }, delay);
-  });
+  return { days, hours, minutes, seconds };
+}
 
-  promise
-    .then(message => {
-      iziToast.success({
-        title: 'Success',
-        message: message,
-        position: 'topRight',
+function updateTimerDisplay({ days, hours, minutes, seconds }) {
+  daysEl.textContent = addLeadingZero(days);
+  hoursEl.textContent = addLeadingZero(hours);
+  minutesEl.textContent = addLeadingZero(minutes);
+  secondsEl.textContent = addLeadingZero(seconds);
+}
+
+const options = {
+  enableTime: true,
+  time_24hr: true,
+  defaultDate: new Date(),
+  minuteIncrement: 1,
+  onClose(selectedDates) {
+    const selected = selectedDates[0];
+    const now = new Date();
+
+    if (selected <= now) {
+      iziToast.warning({
+        title: 'Uyarı',
+        message: 'Please choose a date in the future',
+        position: 'topCenter',
       });
-    })
-    .catch(message => {
-      iziToast.error({
-        title: 'Error',
-        message: message,
-        position: 'topRight',
-      });
-    });
-  form.reset();
+      startBtn.disabled = true;
+    } else {
+      userSelectedDate = selected;
+      startBtn.disabled = false;
+    }
+  },
+};
+
+flatpickr(dateInput, options);
+
+startBtn.addEventListener('click', () => {
+  startBtn.disabled = true;
+  dateInput.disabled = true;
+
+  countdownInterval = setInterval(() => {
+    const now = new Date();
+    const diff = userSelectedDate - now;
+
+    if (diff <= 0) {
+      clearInterval(countdownInterval);
+      updateTimerDisplay({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+
+    const time = convertMs(diff);
+    updateTimerDisplay(time);
+  }, 1000);
 });
